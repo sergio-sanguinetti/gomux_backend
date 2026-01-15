@@ -1,0 +1,217 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Usuario {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  password  String
+  nombre    String?
+  rol       String   @default("vendedor")
+  activo    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("usuarios")
+}
+
+model Categoria {
+  id          Int      @id @default(autoincrement())
+  nombre      String
+  slug        String?  @unique // URL amigable para SEO
+  descripcion String?
+  activo      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  subcategorias Subcategoria[]
+  productos    Producto[]
+
+  @@map("categorias")
+}
+
+model Subcategoria {
+  id          Int      @id @default(autoincrement())
+  nombre      String
+  descripcion String?
+  categoriaId Int
+  activo      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  categoria Categoria @relation(fields: [categoriaId], references: [id], onDelete: Cascade)
+  productos Producto[]
+
+  @@map("subcategorias")
+}
+
+model TipoMaterial {
+  id          Int      @id @default(autoincrement())
+  nombre      String   @unique
+  descripcion String?
+  activo      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  productos Producto[]
+
+  @@map("tipo_material")
+}
+
+model Etiqueta {
+  id          Int      @id @default(autoincrement())
+  nombre      String   @unique
+  descripcion String?
+  activo      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  productos ProductoEtiqueta[]
+
+  @@map("etiquetas")
+}
+
+model ProductoEtiqueta {
+  id         Int      @id @default(autoincrement())
+  productoId Int
+  etiquetaId Int
+  createdAt  DateTime @default(now())
+
+  producto Producto @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  etiqueta Etiqueta @relation(fields: [etiquetaId], references: [id], onDelete: Cascade)
+
+  @@unique([productoId, etiquetaId])
+  @@map("producto_etiqueta")
+}
+
+model Producto {
+  id                Int      @id @default(autoincrement())
+  nombre            String
+  slug              String?  @unique // URL amigable para SEO: categoria/nombre-del-producto
+  descripcion       String?
+  descripcionDetallada String? @db.Text // Descripción detallada con formato "Acerca de este artículo"
+  categoriaId       Int
+  subcategoriaId    Int
+  tipoMaterialId    Int
+  tamano            String?  @db.VarChar(100)
+  color             String?  @db.VarChar(100)
+  costoProduccion   Decimal  @db.Decimal(10, 2)
+  costoVenta        Decimal  @db.Decimal(10, 2)
+  stock             Int      @default(0)
+  esNuevo           Boolean  @default(false)
+  esDestacado       Boolean  @default(false)
+  activo            Boolean  @default(true)
+  imagenPrincipal   String?
+  galeriaImagenes   String?  @db.Text // JSON array de URLs de imágenes
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  categoria         Categoria      @relation(fields: [categoriaId], references: [id])
+  subcategoria      Subcategoria   @relation(fields: [subcategoriaId], references: [id])
+  tipoMaterial      TipoMaterial   @relation(fields: [tipoMaterialId], references: [id])
+  etiquetas         ProductoEtiqueta[]
+  ventasPorMayor    VentaPorMayor[]
+
+  @@map("productos")
+}
+
+model VentaPorMayor {
+  id                Int      @id @default(autoincrement())
+  productoId       Int
+  cantidadMinima   Int      // Cantidad mínima de unidades para aplicar este precio
+  precioPorCantidad Decimal  @db.Decimal(10, 2) // Precio total por la cantidad mínima
+  descuento         Decimal? @db.Decimal(5, 2) // Porcentaje de descuento (opcional)
+  activo            Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  producto          Producto @relation(fields: [productoId], references: [id], onDelete: Cascade)
+
+  @@map("ventas_por_mayor")
+}
+
+model Configuracion {
+  id                              Int      @id @default(autoincrement())
+  // Información General
+  nombreTienda                    String?  @default("Tienda de Llaveros")
+  emailContacto                   String?
+  telefono                        String?
+  direccion                      String?  @db.Text
+  // Configuración de Inventario
+  alertasStockBajo                Boolean  @default(true)
+  stockMinimo                     Int      @default(10)
+  actualizacionAutomaticaInventario Boolean @default(true)
+  // Notificaciones
+  notificacionesEmail             Boolean  @default(true)
+  notificacionesNuevasOrdenes     Boolean  @default(true)
+  notificacionesProductosAgotados Boolean  @default(false)
+  reportesSemanales               Boolean  @default(true)
+  createdAt                       DateTime @default(now())
+  updatedAt                       DateTime @updatedAt
+
+  @@map("configuracion")
+}
+
+model ConfiguracionPagina {
+  id                    Int      @id @default(autoincrement())
+  // Productos destacados - almacenados como JSON array de IDs
+  productosTop          String?  @db.Text // JSON array: [1, 2, 3, 4]
+  productosRecienLlegados String? @db.Text // JSON array: [1, 2, 3, 4]
+  productosMasVendidos  String?  @db.Text // JSON array: [1, 2, 3, 4]
+  // Slider/Banners promocionales - almacenados como JSON array de URLs
+  bannersSliderPrincipal String?  @db.Text // JSON array: ["/images/banner1.jpg", "/images/banner2.jpg"] - Slider principal al inicio
+  bannersSlider         String?  @db.Text // JSON array: ["/images/banner1.jpg", "/images/banner2.jpg"] - Slider encima de "LOS MÁS VENDIDOS"
+  // Banner superior (Topbar)
+  topbarTexto          String?  @db.VarChar(255) // Texto del banner superior
+  topbarColorFondo    String?  @db.VarChar(7) // Color de fondo en formato hex (#FF69B4)
+  topbarColorTexto     String?  @db.VarChar(7) // Color del texto en formato hex (#000000)
+  topbarVisible        Boolean  @default(true) // Si el banner es visible o no
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@map("configuracion_pagina")
+}
+
+model Venta {
+  id                    Int      @id @default(autoincrement())
+  numeroOrden           String   @unique // Número de orden único
+  // Información del cliente
+  nombreCliente          String
+  apellidoCliente        String
+  email                  String
+  telefono               String?
+  // Dirección de entrega
+  direccion              String   @db.Text
+  ciudad                 String
+  estadoDireccion        String   // Estado/Provincia de la dirección
+  codigoPostal           String
+  pais                   String   @default("México")
+  // Información de pago
+  metodoPago             String   @default("tarjeta") // tarjeta, efectivo, transferencia
+  numeroTarjeta          String?  // Últimos 4 dígitos
+  nombreTarjeta          String?
+  fechaExpiracion        String?
+  cvv                    String?
+  // Totales
+  subtotal               Decimal  @db.Decimal(10, 2)
+  descuento              Decimal  @db.Decimal(10, 2) @default(0)
+  envio                  Decimal  @db.Decimal(10, 2) @default(0)
+  total                  Decimal  @db.Decimal(10, 2)
+  // Estado de la venta
+  estado                 String   @default("pendiente") // pendiente, procesando, enviado, entregado, cancelado
+  notas                  String?  @db.Text
+  // Productos de la venta (JSON)
+  productos              String   @db.Text // JSON array con productos, cantidades y precios
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  @@map("ventas")
+}
