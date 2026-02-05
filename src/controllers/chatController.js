@@ -71,6 +71,13 @@ const crearObtenerConversacion = async (req, res) => {
 // Listar conversaciones (admin - requiere auth)
 const listarConversaciones = async (req, res) => {
   try {
+    if (!prisma.conversacionChat) {
+      logger.error('Prisma client sin modelo conversacionChat. Ejecuta: npx prisma generate');
+      return res.status(500).json({
+        success: false,
+        message: 'Error de configuración: ejecuta "npx prisma generate" en el backend y vuelve a desplegar.'
+      });
+    }
     const conversaciones = await prisma.conversacionChat.findMany({
       orderBy: { updatedAt: 'desc' },
       include: {
