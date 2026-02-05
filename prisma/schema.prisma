@@ -174,6 +174,9 @@ model ConfiguracionPagina {
   topbarColorFondo    String?  @db.VarChar(7) // Color de fondo en formato hex (#FF69B4)
   topbarColorTexto     String?  @db.VarChar(7) // Color del texto en formato hex (#000000)
   topbarVisible        Boolean  @default(true) // Si el banner es visible o no
+  // Categorías mostradas en la barra de navegación (orden)
+  categoriasNav        String?  @db.Text // JSON array de IDs: [1, 2, 3]
+  categoriaDestacadaId Int?     // ID de la categoría a resaltar en el menú (usa topbarColorFondo)
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 
@@ -213,5 +216,35 @@ model Venta {
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt
 
+  conversacionesChat     ConversacionChat[]
+
   @@map("ventas")
+}
+
+// Chat: conversaciones con clientes (soporte / pedidos)
+model ConversacionChat {
+  id            Int      @id @default(autoincrement())
+  clienteNombre String
+  clienteEmail  String
+  ventaId       Int?
+  numeroOrden   String?  @db.VarChar(100) // Para mostrar en admin sin join
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  venta         Venta?   @relation(fields: [ventaId], references: [id], onDelete: SetNull)
+  mensajes      MensajeChat[]
+
+  @@map("conversaciones_chat")
+}
+
+model MensajeChat {
+  id              Int      @id @default(autoincrement())
+  conversacionId  Int
+  remitente       String   // 'cliente' | 'admin'
+  contenido       String   @db.Text
+  createdAt       DateTime @default(now())
+
+  conversacion    ConversacionChat @relation(fields: [conversacionId], references: [id], onDelete: Cascade)
+
+  @@map("mensajes_chat")
 }

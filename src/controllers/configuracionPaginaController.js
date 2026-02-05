@@ -17,7 +17,8 @@ const obtenerConfiguracionPagina = async (req, res) => {
           topbarTexto: 'ENVÍO GRATIS SOBRE $599',
           topbarColorFondo: '#FF69B4',
           topbarColorTexto: '#000000',
-          topbarVisible: true
+          topbarVisible: true,
+          categoriasNav: JSON.stringify([])
         }
       });
     }
@@ -29,7 +30,9 @@ const obtenerConfiguracionPagina = async (req, res) => {
       productosRecienLlegados: configuracion.productosRecienLlegados ? JSON.parse(configuracion.productosRecienLlegados) : [],
       productosMasVendidos: configuracion.productosMasVendidos ? JSON.parse(configuracion.productosMasVendidos) : [],
       bannersSliderPrincipal: configuracion.bannersSliderPrincipal ? JSON.parse(configuracion.bannersSliderPrincipal) : [],
-      bannersSlider: configuracion.bannersSlider ? JSON.parse(configuracion.bannersSlider) : []
+      bannersSlider: configuracion.bannersSlider ? JSON.parse(configuracion.bannersSlider) : [],
+      categoriasNav: configuracion.categoriasNav ? JSON.parse(configuracion.categoriasNav) : [],
+      categoriaDestacadaId: configuracion.categoriaDestacadaId ?? null
     };
 
     res.json({
@@ -58,7 +61,9 @@ const actualizarConfiguracionPagina = async (req, res) => {
       topbarTexto,
       topbarColorFondo,
       topbarColorTexto,
-      topbarVisible
+      topbarVisible,
+      categoriasNav,
+      categoriaDestacadaId
     } = req.body;
 
     // Obtener configuración existente o crear una nueva
@@ -85,6 +90,12 @@ const actualizarConfiguracionPagina = async (req, res) => {
     if (topbarColorFondo !== undefined) updateData.topbarColorFondo = topbarColorFondo;
     if (topbarColorTexto !== undefined) updateData.topbarColorTexto = topbarColorTexto;
     if (topbarVisible !== undefined) updateData.topbarVisible = topbarVisible === 'true' || topbarVisible === true;
+    if (categoriasNav !== undefined) {
+      updateData.categoriasNav = JSON.stringify(Array.isArray(categoriasNav) ? categoriasNav : []);
+    }
+    if (categoriaDestacadaId !== undefined) {
+      updateData.categoriaDestacadaId = categoriaDestacadaId === null || categoriaDestacadaId === '' ? null : Number(categoriaDestacadaId);
+    }
 
     if (configuracion) {
       // Actualizar configuración existente
@@ -104,7 +115,9 @@ const actualizarConfiguracionPagina = async (req, res) => {
           topbarTexto: topbarTexto || 'ENVÍO GRATIS SOBRE $599',
           topbarColorFondo: topbarColorFondo || '#FF69B4',
           topbarColorTexto: topbarColorTexto || '#000000',
-          topbarVisible: topbarVisible === 'true' || topbarVisible === true || topbarVisible === undefined
+          topbarVisible: topbarVisible === 'true' || topbarVisible === true || topbarVisible === undefined,
+          categoriasNav: JSON.stringify(Array.isArray(categoriasNav) ? categoriasNav : []),
+        categoriaDestacadaId: (categoriaDestacadaId == null || categoriaDestacadaId === '') ? null : Number(categoriaDestacadaId)
         }
       });
     }
@@ -116,7 +129,8 @@ const actualizarConfiguracionPagina = async (req, res) => {
       productosRecienLlegados: configuracion.productosRecienLlegados ? JSON.parse(configuracion.productosRecienLlegados) : [],
       productosMasVendidos: configuracion.productosMasVendidos ? JSON.parse(configuracion.productosMasVendidos) : [],
       bannersSliderPrincipal: configuracion.bannersSliderPrincipal ? JSON.parse(configuracion.bannersSliderPrincipal) : [],
-      bannersSlider: configuracion.bannersSlider ? JSON.parse(configuracion.bannersSlider) : []
+      bannersSlider: configuracion.bannersSlider ? JSON.parse(configuracion.bannersSlider) : [],
+      categoriasNav: configuracion.categoriasNav ? JSON.parse(configuracion.categoriasNav) : []
     };
 
     res.json({
@@ -151,7 +165,9 @@ const obtenerProductosDestacados = async (req, res) => {
           topbarTexto: 'ENVÍO GRATIS SOBRE $599',
           topbarColorFondo: '#FF69B4',
           topbarColorTexto: '#000000',
-          topbarVisible: true
+          topbarVisible: true,
+          categoriasNav: [],
+          categoriasNavDetalle: []
         }
       });
     }
@@ -162,6 +178,7 @@ const obtenerProductosDestacados = async (req, res) => {
     const productosMasVendidosIds = configuracion.productosMasVendidos ? JSON.parse(configuracion.productosMasVendidos) : [];
     const bannersSliderPrincipal = configuracion.bannersSliderPrincipal ? JSON.parse(configuracion.bannersSliderPrincipal) : [];
     const bannersSlider = configuracion.bannersSlider ? JSON.parse(configuracion.bannersSlider) : [];
+    const categoriasNavIds = configuracion.categoriasNav ? JSON.parse(configuracion.categoriasNav) : [];
 
     // Obtener productos con sus relaciones
     const [productosTop, productosRecienLlegados, productosMasVendidos] = await Promise.all([
@@ -246,6 +263,18 @@ const obtenerProductosDestacados = async (req, res) => {
       .map(id => productosMasVendidos.find(p => p.id === id))
       .filter(p => p !== undefined);
 
+    // Categorías para la barra de navegación (orden y detalle)
+    let categoriasNavDetalle = [];
+    if (categoriasNavIds.length > 0) {
+      const categorias = await prisma.categoria.findMany({
+        where: { id: { in: categoriasNavIds }, activo: true },
+        select: { id: true, nombre: true, slug: true }
+      });
+      categoriasNavDetalle = categoriasNavIds
+        .map(id => categorias.find(c => c.id === id))
+        .filter(Boolean);
+    }
+
     res.json({
       success: true,
       data: {
@@ -257,7 +286,10 @@ const obtenerProductosDestacados = async (req, res) => {
         topbarTexto: configuracion.topbarTexto || 'ENVÍO GRATIS SOBRE $599',
         topbarColorFondo: configuracion.topbarColorFondo || '#FF69B4',
         topbarColorTexto: configuracion.topbarColorTexto || '#000000',
-        topbarVisible: configuracion.topbarVisible !== undefined ? configuracion.topbarVisible : true
+        topbarVisible: configuracion.topbarVisible !== undefined ? configuracion.topbarVisible : true,
+        categoriasNav: categoriasNavIds,
+        categoriasNavDetalle,
+        categoriaDestacadaId: configuracion.categoriaDestacadaId ?? null
       }
     });
   } catch (error) {

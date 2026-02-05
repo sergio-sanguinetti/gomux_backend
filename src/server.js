@@ -1,4 +1,5 @@
 const express = require('express');
+require('express-async-errors'); // Captura errores en handlers async y los pasa al errorHandler
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
@@ -6,6 +7,8 @@ const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
 const fs = require('fs');
+const http = require('http');
+const { Server: SocketServer } = require('socket.io');
 require('dotenv').config();
 
 // Importar rutas
@@ -21,6 +24,9 @@ const configuracionPaginaRoutes = require('./routes/configuracionPaginaRoutes');
 const etiquetaRoutes = require('./routes/etiquetaRoutes');
 const ventaPorMayorRoutes = require('./routes/ventaPorMayorRoutes');
 const ventaRoutes = require('./routes/ventaRoutes');
+const envíoRoutes = require('./routes/envioRoutes');
+const pagosRoutes = require('./routes/pagosRoutes');
+const chatRoutes = require('./routes/chatRoutes');
 
 // Importar middleware
 const errorHandler = require('./middleware/errorHandler');
@@ -106,29 +112,35 @@ if (filesInUploads.length > 0) {
   logger.info('📁 Primeros archivos:', filesInUploads.slice(0, 3));
 }
 
-// Ruta específica para servir archivos de uploads
+// Ruta específica para servir archivos de uploads (no debe tirar el servidor si falta el archivo)
 app.get('/uploads/:filename', (req, res) => {
-  const filename = req.params.filename;
-  const filePath = path.join(uploadsPath, filename);
-  
-  logger.info(`🔍 Solicitud de archivo: ${filename}`);
-  logger.info(`📁 Ruta completa: ${filePath}`);
-  logger.info(`📁 ¿Existe?: ${fs.existsSync(filePath)}`);
-  
-  if (!fs.existsSync(filePath)) {
-    logger.error(`❌ Archivo no encontrado: ${filePath}`);
-    return res.status(404).json({
-      success: false,
-      message: 'Archivo no encontrado',
-      path: req.originalUrl,
-      searchedPath: filePath
+  try {
+    const filename = req.params.filename;
+    const filePath = path.join(uploadsPath, filename);
+
+    if (!fs.existsSync(filePath)) {
+      logger.warn(`Archivo no encontrado: ${filename}`);
+      return res.status(404).json({
+        success: false,
+        message: 'Archivo no encontrado',
+        path: req.originalUrl
+      });
+    }
+
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cache-Control', 'public, max-age=31536000');
+    res.sendFile(filePath, (err) => {
+      if (err && !res.headersSent) {
+        logger.error('Error al enviar archivo:', err.message);
+        res.status(500).json({ success: false, message: 'Error al servir el archivo' });
+      }
     });
+  } catch (err) {
+    logger.error('Error en ruta /uploads:', err.message);
+    if (!res.headersSent) {
+      res.status(500).json({ success: false, message: 'Error interno' });
+    }
   }
-  
-  // Enviar el archivo
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Cache-Control', 'public, max-age=31536000');
-  res.sendFile(filePath);
 });
 
 // También mantener el middleware estático como respaldo
@@ -162,6 +174,9 @@ app.use('/api/configuracion-pagina', configuracionPaginaRoutes);
 app.use('/api/etiquetas', etiquetaRoutes);
 app.use('/api/ventas-por-mayor', ventaPorMayorRoutes);
 app.use('/api/ventas', ventaRoutes);
+app.use('/api/envio', envíoRoutes);
+app.use('/api/pagos', pagosRoutes);
+app.use('/api/chat', chatRoutes);
 
 // Ruta de salud del servidor
 app.get('/api/health', (req, res) => {
@@ -201,23 +216,92 @@ app.use((req, res) => {
 // Middleware de manejo de errores
 app.use(errorHandler);
 
-// Iniciar servidor
-app.listen(PORT, () => {
-  logger.info(`🚀 Servidor iniciado en puerto ${PORT}`);
-  logger.info(`📊 Entorno: ${process.env.NODE_ENV || 'development'}`);
-  logger.info(`🌐 URL: http://localhost:${PORT}`);
-  logger.info(`📋 Documentación: http://localhost:${PORT}/api-docs`);
+// Servidor HTTP (para Express + Socket.io)
+const httpServer = http.createServer(app);
+const io = new SocketServer(httpServer, {
+  cors: {
+    origin: [
+      process.env.FRONTEND_URL || 'http://localhost:3000',
+      'http://localhost:3000',
+      'http://localhost:3001',
+      process.env.GOMUX_URL || 'http://localhost:3001'
+    ],
+    methods: ['GET', 'POST']
+  }
+});
+const { setupChatSocket } = require('./sockets/chatSocket');
+setupChatSocket(io);
+
+let server = httpServer;
+try {
+  server.listen(PORT, () => {
+    logger.info(`🚀 Servidor iniciado en puerto ${PORT}`);
+    logger.info(`📊 Entorno: ${process.env.NODE_ENV || 'development'}`);
+    logger.info(`🌐 URL: http://localhost:${PORT}`);
+    logger.info(`💬 Socket.io (chat) habilitado`);
+  });
+} catch (err) {
+  logger.error('❌ Error al iniciar el servidor:', err);
+  process.exit(1);
+}
+
+// Error del servidor (ej: puerto en uso)
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    logger.error(`❌ Puerto ${PORT} ya está en uso. Cierra la otra aplicación o cambia PORT en .env`);
+  } else {
+    logger.error('❌ Error del servidor HTTP:', err);
+  }
+  process.exit(1);
 });
 
-// Manejo de errores no capturados
+// Cierre graceful: desconectar Prisma y cerrar el servidor
+function gracefulShutdown(signal) {
+  logger.info(`\n⚠️ Recibido ${signal}. Cerrando servidor de forma segura...`);
+  const done = () => {
+    prisma.$disconnect()
+      .then(() => {
+        logger.info('Base de datos desconectada.');
+        process.exit(0);
+      })
+      .catch((err) => {
+        logger.error('Error al desconectar BD:', err);
+        process.exit(1);
+      });
+  };
+  if (server) {
+    server.close((err) => {
+      if (err) logger.error('Error al cerrar servidor:', err);
+      else logger.info('Servidor HTTP cerrado.');
+      done();
+    });
+    // Forzar cierre de conexiones tras 10s
+    setTimeout(() => {
+      logger.warn('Timeout de cierre. Forzando salida.');
+      process.exit(1);
+    }, 10000);
+  } else {
+    done();
+  }
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+// Errores no capturados: loguear y salir para que nodemon pueda reiniciar
+function exitAfterLog(code, err) {
+  const msg = err && err.stack ? err.stack : String(err);
+  logger.error('Error fatal (el proceso se reiniciará si usas nodemon):', msg);
+  setTimeout(() => process.exit(code), 1000);
+}
+
 process.on('uncaughtException', (err) => {
-  logger.error('Error no capturado:', err);
-  process.exit(1);
+  exitAfterLog(1, err);
 });
 
-process.on('unhandledRejection', (err) => {
-  logger.error('Promesa rechazada no manejada:', err);
-  process.exit(1);
+process.on('unhandledRejection', (reason, promise) => {
+  logger.error('Promesa rechazada no manejada:', { reason, promise });
+  exitAfterLog(1, reason);
 });
 
 module.exports = app;

@@ -57,7 +57,30 @@ const verificarToken = (req, res, next) => {
   }
 };
 
+// Opcional: si hay token válido, pone req.user; si no, continúa sin él
+const optionalAuth = (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return next();
+    }
+    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : authHeader;
+    if (!token) {
+      return next();
+    }
+    const decoded = jwt.verify(
+      token,
+      process.env.JWT_SECRET || 'secret_key_default'
+    );
+    req.user = decoded;
+    next();
+  } catch {
+    next();
+  }
+};
+
 module.exports = {
-  verificarToken
+  verificarToken,
+  optionalAuth
 };
 

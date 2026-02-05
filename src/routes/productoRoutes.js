@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { 
   listarProductos, 
+  buscarProductos,
   obtenerProducto,
   obtenerProductoPorSlug, 
   crearProducto, 
@@ -14,6 +15,7 @@ const { uploadImagenPrincipal, uploadGaleria, upload } = require('../middleware/
 // Rutas públicas (sin autenticación)
 // IMPORTANTE: La ruta de slug debe ir ANTES de /public/:id para evitar conflictos
 router.get('/public', listarProductos);
+router.get('/public/search', buscarProductos);
 // Ruta para slug con catch-all para manejar slugs con /
 router.get('/public/slug/*', (req, res, next) => {
   // Extraer el slug de la ruta (todo después de /public/slug/)

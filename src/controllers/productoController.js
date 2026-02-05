@@ -55,6 +55,58 @@ const listarProductos = async (req, res) => {
   }
 };
 
+// Búsqueda flexible: nombre, categoría, subcategoría, material, etiquetas
+const buscarProductos = async (req, res) => {
+  try {
+    const q = (req.query.q || '').trim();
+    const categoriaId = req.query.categoria ? parseInt(req.query.categoria, 10) : null;
+    const limit = Math.min(parseInt(req.query.limit, 10) || 50, 100);
+
+    const where = { activo: true };
+
+    if (q.length > 0) {
+      where.OR = [
+        { nombre: { contains: q } },
+        { categoria: { nombre: { contains: q } } },
+        { subcategoria: { nombre: { contains: q } } },
+        { tipoMaterial: { nombre: { contains: q } } },
+        { etiquetas: { some: { etiqueta: { nombre: { contains: q } } } } }
+      ];
+    }
+
+    if (categoriaId && !isNaN(categoriaId)) {
+      where.categoriaId = categoriaId;
+    }
+
+    const productos = await prisma.producto.findMany({
+      where,
+      take: limit,
+      include: {
+        categoria: { select: { id: true, nombre: true } },
+        subcategoria: { select: { id: true, nombre: true } },
+        tipoMaterial: { select: { id: true, nombre: true } },
+        etiquetas: {
+          include: { etiqueta: { select: { id: true, nombre: true } } }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    res.json({
+      success: true,
+      data: { productos },
+      total: productos.length
+    });
+  } catch (error) {
+    console.error('Error en buscarProductos:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al buscar productos',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
 // Obtener un producto por ID
 const obtenerProducto = async (req, res) => {
   try {
@@ -560,6 +612,7 @@ const eliminarProducto = async (req, res) => {
 
 module.exports = {
   listarProductos,
+  buscarProductos,
   obtenerProducto,
   obtenerProductoPorSlug,
   crearProducto,
