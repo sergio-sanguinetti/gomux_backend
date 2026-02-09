@@ -42,11 +42,12 @@ async function calcularPaquete(items) {
         where: { id: productId }
       });
       if (product) {
-        // Si en el futuro agregas peso, largo, ancho, alto a Producto, descomenta:
-        // const peso = (product.peso ?? defaultWeightPerUnit) * cantidad;
-        // const vol = (product.largo ?? 10) * (product.ancho ?? 10) * (product.alto ?? 10) * cantidad;
-        totalWeight += defaultWeightPerUnit * cantidad;
-        totalVolume += defaultVolumePerUnit * cantidad;
+        const pesoUnit = product.peso != null ? parseFloat(product.peso) : defaultWeightPerUnit;
+        const largoCm = product.largo != null ? parseFloat(product.largo) : 10;
+        const anchoCm = product.ancho != null ? parseFloat(product.ancho) : 10;
+        const altoCm = product.alto != null ? parseFloat(product.alto) : 10;
+        totalWeight += pesoUnit * cantidad;
+        totalVolume += largoCm * anchoCm * altoCm * cantidad;
       } else {
         totalWeight += defaultWeightPerUnit * cantidad;
         totalVolume += defaultVolumePerUnit * cantidad;
@@ -165,19 +166,21 @@ const cotizarEnvio = async (req, res) => {
         headers: { Authorization: `Bearer ${bearerToken}` }
       });
       const rawRates = getRes.data?.rates || getRes.data?.data || [];
-      // Normalizar cada rate para que el frontend siempre tenga carrier, service, price y deliveryDays
+      // Normalizar: Skydropx devuelve provider_display_name, provider_service_name, total, days
       const rates = rawRates.map((r, idx) => {
         const att = r.attributes || r;
-        const price = att.total_price ?? att.price ?? r.total_price ?? r.price ?? att.amount ?? r.amount ?? 0;
-        const carrier = att.carrier ?? att.carrier_name ?? r.carrier ?? r.carrier_name ?? '';
-        const service = att.service ?? att.service_name ?? r.service ?? r.service_name ?? att.name ?? '';
-        const deliveryDays = att.delivery_days ?? att.delivery_days_estimated ?? r.delivery_days ?? r.delivery_days_estimated ?? att.estimated_days ?? '';
+        const obj = att && typeof att === 'object' ? { ...r, ...att } : r;
+        const price = obj.total ?? obj.total_price ?? obj.price ?? obj.amount ?? 0;
+        const carrier = obj.provider_display_name ?? obj.provider_name ?? obj.carrier ?? obj.carrier_name ?? '';
+        const service = obj.provider_service_name ?? obj.provider_service_code ?? obj.service ?? obj.service_name ?? obj.name ?? '';
+        const deliveryDays = obj.days ?? obj.delivery_days ?? obj.delivery_days_estimated ?? obj.estimated_days ?? '';
+        const numPrice = typeof price === 'number' ? price : parseFloat(price) || 0;
         return {
-          id: r.id ?? att.id ?? `rate-${idx}`,
+          id: r.id ?? obj.id ?? `rate-${idx}`,
           carrier: String(carrier).trim(),
           service: String(service).trim(),
-          price: typeof price === 'number' ? price : parseFloat(price) || 0,
-          deliveryDays: deliveryDays != null ? String(deliveryDays).trim() : '',
+          price: numPrice,
+          deliveryDays: deliveryDays != null && deliveryDays !== '' ? String(deliveryDays).trim() : '',
           _raw: r
         };
       });

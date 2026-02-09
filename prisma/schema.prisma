@@ -20,7 +20,22 @@ model Usuario {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  favoritos Favorito[]
+
   @@map("usuarios")
+}
+
+model Favorito {
+  id         Int      @id @default(autoincrement())
+  usuarioId  Int
+  productoId Int
+  createdAt  DateTime @default(now())
+
+  usuario    Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  producto   Producto @relation(fields: [productoId], references: [id], onDelete: Cascade)
+
+  @@unique([usuarioId, productoId])
+  @@map("favoritos")
 }
 
 model Categoria {
@@ -34,6 +49,7 @@ model Categoria {
   
   subcategorias Subcategoria[]
   productos    Producto[]
+  descuentos   Descuento[]
 
   @@map("categorias")
 }
@@ -103,6 +119,10 @@ model Producto {
   tipoMaterialId    Int
   tamano            String?  @db.VarChar(100)
   color             String?  @db.VarChar(100)
+  peso              Decimal? @db.Decimal(10, 3)   // Peso en kg (para Skydropx)
+  alto              Decimal? @db.Decimal(10, 2)     // Alto en cm
+  ancho             Decimal? @db.Decimal(10, 2)     // Ancho en cm
+  largo             Decimal? @db.Decimal(10, 2)    // Largo en cm
   costoProduccion   Decimal  @db.Decimal(10, 2)
   costoVenta        Decimal  @db.Decimal(10, 2)
   stock             Int      @default(0)
@@ -119,6 +139,8 @@ model Producto {
   tipoMaterial      TipoMaterial   @relation(fields: [tipoMaterialId], references: [id])
   etiquetas         ProductoEtiqueta[]
   ventasPorMayor    VentaPorMayor[]
+  descuentos        Descuento[]
+  favoritos         Favorito[]
 
   @@map("productos")
 }
@@ -136,6 +158,29 @@ model VentaPorMayor {
   producto          Producto @relation(fields: [productoId], references: [id], onDelete: Cascade)
 
   @@map("ventas_por_mayor")
+}
+
+// Descuentos: global, por categoría o por producto
+model Descuento {
+  id          Int       @id @default(autoincrement())
+  nombre      String
+  descripcion String?   @db.Text
+  codigo      String?   @db.VarChar(50)  // Código opcional para canje (ej. NAVIDAD20)
+  tipo        String    @db.VarChar(20)  // 'global' | 'categoria' | 'producto'
+  categoriaId Int?
+  productoId  Int?
+  porcentaje  Decimal   @db.Decimal(5, 2)
+  temporada   String?   @db.VarChar(100)
+  fechaInicio DateTime  @db.Date
+  fechaFin    DateTime  @db.Date
+  activo      Boolean   @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  categoria   Categoria? @relation(fields: [categoriaId], references: [id], onDelete: SetNull)
+  producto    Producto?  @relation(fields: [productoId], references: [id], onDelete: SetNull)
+
+  @@map("descuentos")
 }
 
 model Configuracion {

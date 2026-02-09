@@ -252,6 +252,10 @@ const crearProducto = async (req, res) => {
       etiquetasIds,
       tamano,
       color,
+      peso,
+      alto,
+      ancho,
+      largo,
       costoProduccion,
       costoVenta,
       stock,
@@ -328,6 +332,10 @@ const crearProducto = async (req, res) => {
         tipoMaterialId: parseInt(tipoMaterialId),
         tamano: tamano || null,
         color: color || null,
+        peso: peso != null && peso !== '' ? parseFloat(peso) : null,
+        alto: alto != null && alto !== '' ? parseFloat(alto) : null,
+        ancho: ancho != null && ancho !== '' ? parseFloat(ancho) : null,
+        largo: largo != null && largo !== '' ? parseFloat(largo) : null,
         costoProduccion: parseFloat(costoProduccion),
         costoVenta: parseFloat(costoVenta),
         stock: parseInt(stock) || 0,
@@ -403,6 +411,10 @@ const actualizarProducto = async (req, res) => {
       etiquetasIds,
       tamano,
       color,
+      peso,
+      alto,
+      ancho,
+      largo,
       costoProduccion,
       costoVenta,
       stock,
@@ -450,6 +462,10 @@ const actualizarProducto = async (req, res) => {
     if (tipoMaterialId !== undefined) updateData.tipoMaterialId = parseInt(tipoMaterialId);
     if (tamano !== undefined) updateData.tamano = tamano;
     if (color !== undefined) updateData.color = color;
+    if (peso !== undefined) updateData.peso = peso != null && peso !== '' ? parseFloat(peso) : null;
+    if (alto !== undefined) updateData.alto = alto != null && alto !== '' ? parseFloat(alto) : null;
+    if (ancho !== undefined) updateData.ancho = ancho != null && ancho !== '' ? parseFloat(ancho) : null;
+    if (largo !== undefined) updateData.largo = largo != null && largo !== '' ? parseFloat(largo) : null;
     if (costoProduccion !== undefined) updateData.costoProduccion = parseFloat(costoProduccion);
     if (costoVenta !== undefined) updateData.costoVenta = parseFloat(costoVenta);
     if (stock !== undefined) updateData.stock = parseInt(stock);

@@ -20,8 +20,8 @@ const validacionesRegistro = [
     .withMessage('El nombre debe tener entre 2 y 100 caracteres'),
   body('rol')
     .optional()
-    .isIn(['administrador', 'vendedor'])
-    .withMessage('Rol no válido. Solo se permiten: administrador o vendedor')
+    .isIn(['administrador', 'vendedor', 'cliente'])
+    .withMessage('Rol no válido. Solo se permiten: administrador, vendedor o cliente')
 ];
 
 // Validaciones para login

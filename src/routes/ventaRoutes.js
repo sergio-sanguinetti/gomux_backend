@@ -7,7 +7,11 @@ const {
   crearVenta,
   actualizarEstadoVenta,
   eliminarVenta,
-  obtenerEstadisticas
+  obtenerEstadisticas,
+  obtenerDashboardStats,
+  obtenerVentasPorEstado,
+  obtenerVentasPorMes,
+  obtenerMisPedidos
 } = require('../controllers/ventaController');
 const { verificarToken } = require('../middleware/authMiddleware');
 
@@ -53,12 +57,18 @@ router.get('/public/orden/:numeroOrden', async (req, res) => {
   }
 });
 
+// Ruta para cliente: mis pedidos (por email del usuario autenticado)
+router.get('/mis-pedidos', verificarToken, obtenerMisPedidos);
+
 // Todas las demás rutas requieren autenticación
 router.use(verificarToken);
 
 // Rutas
 router.get('/', listarVentas);
 router.get('/estadisticas', obtenerEstadisticas);
+router.get('/dashboard/stats', obtenerDashboardStats);
+router.get('/dashboard/por-estado', obtenerVentasPorEstado);
+router.get('/dashboard/por-mes', obtenerVentasPorMes);
 router.get('/:id', obtenerVenta);
 router.put('/:id/estado', actualizarEstadoVenta);
 router.delete('/:id', eliminarVenta);

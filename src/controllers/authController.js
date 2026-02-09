@@ -40,7 +40,7 @@ const registrar = async (req, res) => {
         email,
         password: passwordHash,
         nombre: nombre || null,
-        rol: rol || 'vendedor',
+        rol: rol || 'cliente',
         activo: true
       },
       select: {
