@@ -35,8 +35,9 @@ const validacionesLogin = [
     .withMessage('La contraseña es requerida')
 ];
 
-// Rutas
+// Rutas (registro y registrar por compatibilidad con el frontend)
 router.post('/registro', validacionesRegistro, registrar);
+router.post('/registrar', validacionesRegistro, registrar);
 router.post('/login', validacionesLogin, login);
 router.get('/perfil', verificarToken, perfil);
 
