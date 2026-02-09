@@ -136,12 +136,19 @@ const cotizarEnvio = async (req, res) => {
       });
     }
 
+    const requestedCarriers = (process.env.SKYDROPX_CARRIERS || 'fedex,dhl').split(',').map(c => c.trim()).filter(Boolean);
+    const parcelForApi = {
+      length: Math.max(1, Math.round(parcel.length)),
+      width: Math.max(1, Math.round(parcel.width)),
+      height: Math.max(1, Math.round(parcel.height)),
+      weight: Math.max(0.1, Math.round(parcel.weight * 10) / 10)
+    };
     const quotationPayload = {
       quotation: {
         address_from,
         address_to: mapped_address_to,
-        parcel,
-        requested_carriers: (process.env.SKYDROPX_CARRIERS || 'fedex,dhl').split(',').map(c => c.trim()).filter(Boolean)
+        parcel: parcelForApi,
+        requested_carriers: requestedCarriers.length ? requestedCarriers : undefined
       }
     };
 
@@ -150,12 +157,31 @@ const cotizarEnvio = async (req, res) => {
       const createRes = await axios.post(`${SKYDROPX_BASE_URL}/api/v1/quotations`, quotationPayload, {
         headers: { Authorization: `Bearer ${bearerToken}`, 'Content-Type': 'application/json' }
       });
-      quotationId = createRes.data.id;
+      const data = createRes.data?.data ?? createRes.data;
+      quotationId = data?.id ?? data?.attributes?.id ?? createRes.data?.id;
+      if (!quotationId) {
+        logger.warn('Skydropx quotation response sin id:', createRes.data);
+      }
     } catch (err) {
-      logger.error('Skydropx create quotation error:', err.response?.data || err.message);
-      return res.status(502).json({
+      const status = err.response?.status;
+      const skydropxData = err.response?.data;
+      logger.error('Skydropx create quotation error:', skydropxData || err.message);
+      const responsePayload = {
         success: false,
         message: 'No se pudo crear la cotización de envío.'
+      };
+      if (process.env.NODE_ENV === 'development' && (status || skydropxData)) {
+        responsePayload.debug = { status, skydropx: skydropxData };
+      }
+      return res.status(502).json(responsePayload);
+    }
+
+    if (!quotationId) {
+      logger.error('Skydropx no devolvió id de cotización');
+      return res.status(502).json({
+        success: false,
+        message: 'No se pudo crear la cotización de envío.',
+        ...(process.env.NODE_ENV === 'development' && { debug: 'Respuesta sin id de cotización' })
       });
     }
 
