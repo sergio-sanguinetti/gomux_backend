@@ -1,0 +1,33 @@
+name: Deploy a Hostinger VPS
+
+on:
+  push:
+    branches:
+      - main  # Se ejecutará cada vez que hagas push a main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v3
+
+      - name: Ejecutar comandos vía SSH
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            # Ir a la carpeta de la app
+            cd ~/app
+            
+            # Traer los cambios de GitHub
+            git pull origin main
+            
+            # Asegurar que la carpeta uploads exista y tenga permisos
+            mkdir -p uploads
+            chmod 775 uploads
+            
+            # Reconstruir solo lo necesario sin apagar la DB si no hay cambios
+            docker-compose up -d --build
