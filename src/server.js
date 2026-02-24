@@ -60,7 +60,7 @@ app.use(compression());
 // Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutos
-  max: 100, // límite de 100 requests por IP por ventana de tiempo
+  max: 1000, // límite de 100 requests por IP por ventana de tiempo
   message: {
     success: false,
     message: 'Demasiadas solicitudes desde esta IP, intenta de nuevo más tarde.'
@@ -79,6 +79,8 @@ app.use(cors({
       process.env.FRONTEND_URL || 'http://localhost:3000',
       'http://localhost:3001',
       'http://localhost:3000',
+      'http://87.77.19.90', // <-- Añade tu IP pública aquí
+      'http://87.77.19.90:3000',
       process.env.GOMUX_URL || 'http://localhost:3001'
     ];
     
@@ -238,12 +240,12 @@ setupChatSocket(io);
 
 let server = httpServer;
 try {
-  server.listen(PORT, () => {
+  server.listen(PORT, '0.0.0.0', () => {
     logger.info(`🚀 Servidor iniciado en puerto ${PORT}`);
     logger.info(`📊 Entorno: ${process.env.NODE_ENV || 'development'}`);
-    logger.info(`🌐 URL: http://localhost:${PORT}`);
+    logger.info(`🌐 URL: http://0.0.0.0:${PORT}`);
     logger.info(`💬 Socket.io (chat) habilitado`);
-  });
+});
 } catch (err) {
   logger.error('❌ Error al iniciar el servidor:', err);
   process.exit(1);
