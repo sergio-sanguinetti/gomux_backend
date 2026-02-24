@@ -239,12 +239,15 @@ const { setupChatSocket } = require('./sockets/chatSocket');
 setupChatSocket(io);
 
 let server = httpServer;
+
+const HOST = '0.0.0.0'; // Esto permite conexiones externas
+
+
 try {
-  server.listen(PORT, '0.0.0.0', () => {
+ server.listen(PORT, HOST, () => {
     logger.info(`🚀 Servidor iniciado en puerto ${PORT}`);
+    logger.info(`🌐 Escuchando en: http://${HOST}:${PORT}`);
     logger.info(`📊 Entorno: ${process.env.NODE_ENV || 'development'}`);
-    logger.info(`🌐 URL: http://0.0.0.0:${PORT}`);
-    logger.info(`💬 Socket.io (chat) habilitado`);
 });
 } catch (err) {
   logger.error('❌ Error al iniciar el servidor:', err);
