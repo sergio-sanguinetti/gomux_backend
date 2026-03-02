@@ -79,7 +79,7 @@ app.use(cors({
       process.env.FRONTEND_URL || 'http://localhost:3000',
       'http://localhost:3001',
       'http://localhost:3000',
-      'http://87.77.19.90', // <-- Añade tu IP pública aquí
+      'http://87.77.19.90', 
       'http://87.77.19.90:3000',
       'https://gomu-mx.vercel.app',
       'https://administracion-gomux.vercel.app',
